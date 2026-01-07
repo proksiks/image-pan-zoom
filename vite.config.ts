@@ -27,5 +27,8 @@ export default defineConfig({
         comments: false
       }
     }
-  }
+  },
+  server: {
+    host: true,
+  },
 });

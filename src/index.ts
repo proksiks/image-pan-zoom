@@ -39,6 +39,10 @@ export interface ImagePanZoomOptions {
    * Enable smooth transitions (default: false)
    */
   transition?: boolean
+  /**
+   * Speed for pinch zoom (default: 1)
+   */
+  pinchSpeed?: number
 }
 
 /**
@@ -91,11 +95,25 @@ export class ImagePanZoom {
 
   private readonly DRAG_THRESHOLD = 3
 
+  private touchStartDistance: number = 0
+  private touchStartScale: number = 1
+  private touchCenterX: number = 0
+  private touchCenterY: number = 0
+  private isPinching: boolean = false
+  private lastTouchCenterX: number = 0
+  private lastTouchCenterY: number = 0
+
+  private isTransitioning: boolean = false
+  private transitionTimeout: number | null = null
+
   private boundWheel: (e: WheelEvent) => void
   private boundPointerDown: (e: PointerEvent) => void
   private boundPointerMove: (e: PointerEvent) => void
   private boundPointerUp: (e: PointerEvent) => void
   private boundDoubleClick: (e: MouseEvent) => void
+  private boundTouchStart: (e: TouchEvent) => void
+  private boundTouchMove: (e: TouchEvent) => void
+  private boundTouchEnd: (e: TouchEvent) => void
 
   constructor(container: HTMLElement, content: HTMLElement, options: ImagePanZoomOptions = {}) {
     this.container = container
@@ -109,6 +127,7 @@ export class ImagePanZoom {
       friction: options.friction ?? 0.92,
       maxSpeed: options.maxSpeed ?? 300,
       transition: options.transition ?? false,
+      pinchSpeed: options.pinchSpeed ?? 1,
     }
 
     this.scale = this.options.initialScale
@@ -122,22 +141,23 @@ export class ImagePanZoom {
     this.boundPointerMove = this.onPointerMove.bind(this)
     this.boundPointerUp = this.onPointerUp.bind(this)
     this.boundDoubleClick = this.onDoubleClick.bind(this)
+    this.boundTouchStart = this.onTouchStart.bind(this)
+    this.boundTouchMove = this.onTouchMove.bind(this)
+    this.boundTouchEnd = this.onTouchEnd.bind(this)
 
     this.init()
   }
 
- /**
-  * Initializes the pan and zoom functionality.
-  * Sets touch-action and user-select CSS properties on the content element.
-  * If transition is enabled, sets the transition CSS property on the content element.
-  * Applies the initial transform to the content element.
-  * Attaches wheel, pointerdown, pointermove, and pointerup event listeners.
-  */
+  /**
+   * Initializes the pan and zoom functionality.
+   * Sets touch-action and user-select CSS properties on the content element.
+   * If transition is enabled, sets the transition CSS property on the content element.
+   * Applies the initial transform to the content element.
+   * Attaches wheel, pointerdown, pointermove, and pointerup event listeners.
+   */
   private init(): void {
-    this.content.style.touchAction = 'none';
-    this.content.style.userSelect = 'none';
-
-    if (this.options.transition) this.content.style.transition = 'transform 0.3s ease-out'
+    this.content.style.touchAction = 'none'
+    this.content.style.userSelect = 'none'
 
     this.applyTransform()
     this.attachEvents()
@@ -149,12 +169,17 @@ export class ImagePanZoom {
     this.content.addEventListener('dblclick', this.boundDoubleClick)
     window.addEventListener('pointermove', this.boundPointerMove)
     window.addEventListener('pointerup', this.boundPointerUp)
+
+
+    this.container.addEventListener('touchstart', this.boundTouchStart, { passive: false })
+    this.container.addEventListener('touchmove', this.boundTouchMove, { passive: false })
+    this.container.addEventListener('touchend', this.boundTouchEnd, { passive: false })
   }
 
- /**
-  * Calculate and return the sizes of container and content elements
-  * @returns Object containing container width/height, padding, and scaled content dimensions
-  */
+  /**
+   * Calculate and return the sizes of container and content elements
+   * @returns Object containing container width/height, padding, and scaled content dimensions
+   */
   private getSizes() {
     const contRect = this.container.getBoundingClientRect()
     const contW = contRect.width
@@ -181,7 +206,7 @@ export class ImagePanZoom {
     } else {
       const halfContW = contW / 2
       const halfW = w / 2
-      
+
       maxX = halfW - halfContW + pad
       minX = -(halfW - halfContW) - pad
     }
@@ -191,7 +216,7 @@ export class ImagePanZoom {
     } else {
       const halfContH = contH / 2
       const halfH = h / 2
-      
+
       maxY = halfH - halfContH + pad
       minY = -(halfH - halfContH) - pad
     }
@@ -202,7 +227,7 @@ export class ImagePanZoom {
     return { x: clampedX, y: clampedY }
   }
 
-  private applyTransform(): void {
+  private applyTransform(useTransition: boolean = false): void {
     this.container.style.overflow = 'hidden'
     if (!this.container.style.position) {
       this.container.style.position = 'relative'
@@ -217,6 +242,23 @@ export class ImagePanZoom {
     const clamped = this.clampPosition(this.x, this.y)
     this.x = clamped.x
     this.y = clamped.y
+
+    if (this.options.transition && useTransition && !this.isTransitioning) {
+      this.content.style.transition = 'transform 0.3s ease-out'
+      this.isTransitioning = true
+
+      if (this.transitionTimeout) {
+        clearTimeout(this.transitionTimeout)
+      }
+      this.transitionTimeout = window.setTimeout(() => {
+        this.content.style.transition = ''
+        this.isTransitioning = false
+        this.transitionTimeout = null
+      }, 300)
+    } else if (!useTransition) {
+      this.content.style.transition = 'none'
+      this.isTransitioning = false
+    }
 
     this.content.style.transform = `translate(-50%, -50%) translate(${this.x}px, ${this.y}px) rotate(${this.rotation}deg) scale(${this.scale})`
   }
@@ -236,7 +278,7 @@ export class ImagePanZoom {
     const rect = this.container.getBoundingClientRect()
     const prevScale = this.scale
     const nextScale = this.clampScale(prevScale * deltaScale)
-    
+
     if (nextScale === prevScale) return
 
     const cx = clientX - rect.left
@@ -255,13 +297,13 @@ export class ImagePanZoom {
     this.x += localX - newLocalX
     this.y += localY - newLocalY
 
-    this.applyTransform()
+    this.applyTransform(false)
   }
 
   private animateKinetic = (): void => {
     if (Math.abs(this.velocityX) < 0.5 && Math.abs(this.velocityY) < 0.5 && Math.abs(this.velocityScale) < 0.001) {
       this.stopAnimation()
-      this.applyTransform()
+      this.applyTransform(false)
       return
     }
 
@@ -275,7 +317,7 @@ export class ImagePanZoom {
     this.velocityY *= this.options.friction
     this.velocityScale *= this.options.friction
 
-    this.applyTransform()
+    this.applyTransform(false)
     this.animationFrameId = requestAnimationFrame(this.animateKinetic)
   }
 
@@ -289,7 +331,7 @@ export class ImagePanZoom {
     const delta = -e.deltaY * this.options.wheelZoomSpeed
     const factor = 1 + delta
     if (factor === 0) return
-    
+
     this.zoomToPoint(e.clientX, e.clientY, factor)
   }
 
@@ -349,7 +391,7 @@ export class ImagePanZoom {
     this.lastScale = this.scale
     this.lastMoveTime = now
 
-    this.applyTransform()
+    this.applyTransform(false)
   }
 
   private onPointerUp(e: PointerEvent): void {
@@ -358,7 +400,7 @@ export class ImagePanZoom {
 
     try {
       this.content.releasePointerCapture(e.pointerId)
-    } catch {}
+    } catch { }
 
     if (this.didMove && (Math.abs(this.velocityX) > 1 || Math.abs(this.velocityY) > 1 || Math.abs(this.velocityScale) > 0.001)) {
       this.animationFrameId = requestAnimationFrame(this.animateKinetic)
@@ -384,7 +426,124 @@ export class ImagePanZoom {
     const newLocalY = localY * scaleRatio
     this.x += localX - newLocalX
     this.y += localY - newLocalY
-    this.applyTransform()
+
+    this.applyTransform(true)
+  }
+
+  private onTouchStart(e: TouchEvent): void {
+    if (e.touches.length === 2) {
+
+      e.preventDefault();
+      this.stopAnimation();
+      this.isPinching = true;
+      this.velocityX = 0;
+      this.velocityY = 0;
+      this.velocityScale = 0;
+
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+
+      const dist = Math.hypot(
+        touch1.clientX - touch2.clientX,
+        touch1.clientY - touch2.clientY
+      );
+
+      this.touchCenterX = (touch1.clientX + touch2.clientX) / 2;
+      this.touchCenterY = (touch1.clientY + touch2.clientY) / 2;
+      this.lastTouchCenterX = this.touchCenterX;
+      this.lastTouchCenterY = this.touchCenterY;
+
+      this.touchStartDistance = dist;
+      this.touchStartScale = this.scale;
+
+      this.isPanning = false;
+      this.didMove = false;
+    } else if (e.touches.length === 1) {
+
+      const touch = e.touches[0];
+      const syntheticEvent = new PointerEvent('pointerdown', {
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        button: 0
+      });
+      this.onPointerDown(syntheticEvent);
+    }
+  }
+
+  private onTouchMove(e: TouchEvent): void {
+    if (e.touches.length === 2 && this.isPinching) {
+      e.preventDefault()
+
+      const touch1 = e.touches[0]
+      const touch2 = e.touches[1]
+
+      const currentDist = Math.hypot(
+        touch1.clientX - touch2.clientX,
+        touch1.clientY - touch2.clientY
+      )
+
+      const currentCenterX = (touch1.clientX + touch2.clientX) / 2
+      const currentCenterY = (touch1.clientY + touch2.clientY) / 2
+
+
+      const scaleMultiplier = currentDist / this.touchStartDistance
+      const newScale = this.touchStartScale * scaleMultiplier * this.options.pinchSpeed
+      const clampedScale = this.clampScale(newScale)
+
+      if (clampedScale !== this.scale) {
+
+        const deltaX = currentCenterX - this.lastTouchCenterX
+        const deltaY = currentCenterY - this.lastTouchCenterY
+
+        this.x += deltaX
+        this.y += deltaY
+
+        const scaleFactor = clampedScale / this.scale
+        this.zoomToPoint(this.touchCenterX, this.touchCenterY, scaleFactor)
+
+        this.lastTouchCenterX = currentCenterX
+        this.lastTouchCenterY = currentCenterY
+      }
+    } else if (e.touches.length === 1 && !this.isPinching) {
+      const touch = e.touches[0]
+      const syntheticEvent = new PointerEvent('pointermove', {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      })
+      this.onPointerMove(syntheticEvent)
+    }
+  }
+
+  private onTouchEnd(e: TouchEvent): void {
+    if (this.isPinching && e.touches.length < 2) {
+      this.isPinching = false;
+
+      const now = Date.now();
+      const dt = now - this.lastMoveTime;
+      if (dt > 0 && dt < 100) {
+        const vx = (this.lastTouchCenterX - this.touchCenterX) / dt * 16;
+        const vy = (this.lastTouchCenterY - this.touchCenterY) / dt * 16;
+
+        this.velocityX = Math.max(-this.options.maxSpeed, Math.min(this.options.maxSpeed, vx));
+        this.velocityY = Math.max(-this.options.maxSpeed, Math.min(this.options.maxSpeed, vy));
+
+        if (Math.abs(this.velocityX) > 1 || Math.abs(this.velocityY) > 1) {
+          this.animationFrameId = requestAnimationFrame(this.animateKinetic);
+        }
+      }
+    }
+
+    if (e.touches.length === 0) {
+      if (this.isPanning) {
+        const syntheticEvent = new PointerEvent('pointerup', {
+          clientX: 0,
+          clientY: 0,
+          button: 0
+        });
+        this.onPointerUp(syntheticEvent);
+      }
+      this.isPinching = false;
+    }
   }
 
   /**
@@ -399,16 +558,8 @@ export class ImagePanZoom {
     this.velocityX = 0
     this.velocityY = 0
     this.velocityScale = 0
-    
-    if (this.options.transition) {
-      this.content.style.transition = 'transform 0.3s ease-out'
-      this.applyTransform()
-      setTimeout(() => {
-        this.content.style.transition = 'transform 0.3s ease-out'
-      }, 300)
-    } else {
-      this.applyTransform()
-    }
+
+    this.applyTransform(true)
   }
 
   /**
@@ -417,16 +568,7 @@ export class ImagePanZoom {
    */
   public rotate(deg: number): void {
     this.rotation = (this.rotation + deg) % 360
-    if (this.options.transition) {
-      this.content.style.transition = 'transform 0.5s ease-out'
-      this.applyTransform()
-
-      setTimeout(() => {
-        this.content.style.transition = 'transform 0.3s ease-out'
-      }, 50)
-    } else {
-      this.applyTransform()
-    }
+    this.applyTransform(true)
   }
 
   /**
@@ -459,16 +601,8 @@ export class ImagePanZoom {
     if (transform.rotation !== undefined) {
       this.rotation = transform.rotation
     }
-    
-    if (this.options.transition) {
-      this.content.style.transition = 'transform 0.3s ease-out'
-      this.applyTransform()
-      setTimeout(() => {
-        this.content.style.transition = 'transform 0.3s ease-out'
-      }, 300)
-    } else {
-      this.applyTransform()
-    }
+
+    this.applyTransform(true)
   }
 
   /**
@@ -476,12 +610,21 @@ export class ImagePanZoom {
    */
   public destroy(): void {
     this.stopAnimation()
+
+    if (this.transitionTimeout) {
+      clearTimeout(this.transitionTimeout)
+    }
+
     this.container.removeEventListener('wheel', this.boundWheel)
     this.content.removeEventListener('pointerdown', this.boundPointerDown)
     this.content.removeEventListener('dblclick', this.boundDoubleClick)
     window.removeEventListener('pointermove', this.boundPointerMove)
     window.removeEventListener('pointerup', this.boundPointerUp)
-    
+
+    this.container.removeEventListener('touchstart', this.boundTouchStart)
+    this.container.removeEventListener('touchmove', this.boundTouchMove)
+    this.container.removeEventListener('touchend', this.boundTouchEnd)
+
     this.content.style.transform = ''
     this.content.style.touchAction = ''
   }
