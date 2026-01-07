@@ -103,6 +103,8 @@ export class ImagePanZoom {
   private lastTouchCenterX: number = 0
   private lastTouchCenterY: number = 0
 
+  private transitionDuration: number = 300
+  private transitionEasing: string = 'ease-out'
   private isTransitioning: boolean = false
   private transitionTimeout: number | null = null
 
@@ -244,7 +246,7 @@ export class ImagePanZoom {
     this.y = clamped.y
 
     if (this.options.transition && useTransition && !this.isTransitioning) {
-      this.content.style.transition = 'transform 0.3s ease-out'
+      this.content.style.transition = `transform ${this.transitionDuration}ms ${this.transitionEasing}`
       this.isTransitioning = true
 
       if (this.transitionTimeout) {
@@ -254,7 +256,7 @@ export class ImagePanZoom {
         this.content.style.transition = ''
         this.isTransitioning = false
         this.transitionTimeout = null
-      }, 300)
+      }, this.transitionDuration)
     } else if (!useTransition) {
       this.content.style.transition = 'none'
       this.isTransitioning = false
@@ -298,6 +300,87 @@ export class ImagePanZoom {
     this.y += localY - newLocalY
 
     this.applyTransform(false)
+  }
+
+  /**
+   * Move the center of the view to the specified coordinates
+   * @param targetX - Target X coordinate in container pixels
+   * @param targetY - Target Y coordinate in container pixels
+   * @param useTransition - Whether to use transition animation (default: true if option is enabled)
+   */
+  public moveTo(targetX: number, targetY: number, useTransition?: boolean): void {
+    this.stopAnimation()
+
+    const rect = this.container.getBoundingClientRect()
+    const centerX = rect.width / 2
+    const centerY = rect.height / 2
+
+    this.x = targetX - centerX
+    this.y = targetY - centerY
+
+    const clamped = this.clampPosition(this.x, this.y)
+    this.x = clamped.x
+    this.y = clamped.y
+
+    const shouldUseTransition = useTransition !== undefined ? useTransition : true
+    this.applyTransform(shouldUseTransition && this.options.transition)
+  }
+
+  /**
+   * Move by specified delta values
+   * @param deltaX - Delta X to move by
+   * @param deltaY - Delta Y to move by
+   * @param useTransition - Whether to use transition animation (default: true if option is enabled)
+   */
+  public moveBy(deltaX: number, deltaY: number, useTransition?: boolean): void {
+    this.stopAnimation()
+
+    this.x += deltaX
+    this.y += deltaY
+
+    const clamped = this.clampPosition(this.x, this.y)
+    this.x = clamped.x
+    this.y = clamped.y
+
+    const shouldUseTransition = useTransition !== undefined ? useTransition : true
+    this.applyTransform(shouldUseTransition && this.options.transition)
+  }
+
+  /**
+   * Zoom to specific scale at specified point
+   * @param scale - Target scale
+   * @param pointX - X coordinate for zoom center (optional, defaults to container center)
+   * @param pointY - Y coordinate for zoom center (optional, defaults to container center)
+   * @param useTransition - Whether to use transition animation (default: true if option is enabled)
+   */
+  public zoomTo(scale: number, pointX?: number, pointY?: number, useTransition?: boolean): void {
+    this.stopAnimation()
+
+    const rect = this.container.getBoundingClientRect()
+    const targetX = pointX !== undefined ? pointX : rect.width / 2
+    const targetY = pointY !== undefined ? pointY : rect.height / 2
+
+    const prevScale = this.scale
+    const nextScale = this.clampScale(scale)
+
+    if (nextScale === prevScale) return
+
+    const centerX = rect.width / 2
+    const centerY = rect.height / 2
+
+    const localX = targetX - centerX - this.x
+    const localY = targetY - centerY - this.y
+
+    const k = nextScale / prevScale
+    const newLocalX = localX * k
+    const newLocalY = localY * k
+
+    this.scale = nextScale
+    this.x += localX - newLocalX
+    this.y += localY - newLocalY
+
+    const shouldUseTransition = useTransition !== undefined ? useTransition : true
+    this.applyTransform(shouldUseTransition && this.options.transition)
   }
 
   private animateKinetic = (): void => {
@@ -588,7 +671,7 @@ export class ImagePanZoom {
    * Set transform state
    * @param transform - Transform object with scale, x, y, and/or rotation values to set
    */
-  public setTransform(transform: Partial<Transform>): void {
+  public setTransform(transform: Partial<Transform>, useTransition?: boolean): void {
     if (transform.scale !== undefined) {
       this.scale = this.clampScale(transform.scale)
     }
@@ -602,7 +685,78 @@ export class ImagePanZoom {
       this.rotation = transform.rotation
     }
 
-    this.applyTransform(true)
+    const shouldUseTransition = useTransition !== undefined ? useTransition : true
+    this.applyTransform(shouldUseTransition && this.options.transition)
+  }
+
+  /**
+   * Get the current viewport bounds in container coordinates
+   * @returns Object with left, top, right, bottom bounds
+   */
+  public getViewportBounds(): { left: number; top: number; right: number; bottom: number } {
+    const rect = this.container.getBoundingClientRect()
+    const centerX = rect.width / 2
+    const centerY = rect.height / 2
+
+    return {
+      left: centerX + this.x,
+      top: centerY + this.y,
+      right: centerX + this.x,
+      bottom: centerY + this.y
+    }
+  }
+
+  /**
+   * Convert container coordinates to image coordinates
+   * @param containerX - X coordinate in container
+   * @param containerY - Y coordinate in container
+   * @returns Object with x, y in image coordinates
+   */
+  public containerToImage(containerX: number, containerY: number): { x: number; y: number } {
+    const rect = this.container.getBoundingClientRect()
+    const contentRect = this.content.getBoundingClientRect()
+    const centerX = rect.width / 2
+    const centerY = rect.height / 2
+
+    const relativeX = containerX - centerX - this.x
+    const relativeY = containerY - centerY - this.y
+
+    const imageX = (relativeX / this.scale) + (contentRect.width / 2 / this.scale)
+    const imageY = (relativeY / this.scale) + (contentRect.height / 2 / this.scale)
+
+    return { x: imageX, y: imageY }
+  }
+
+  /**
+   * Convert image coordinates to container coordinates
+   * @param imageX - X coordinate in image
+   * @param imageY - Y coordinate in image
+   * @returns Object with x, y in container coordinates
+   */
+  public imageToContainer(imageX: number, imageY: number): { x: number; y: number } {
+    const rect = this.container.getBoundingClientRect()
+    const contentRect = this.content.getBoundingClientRect()
+    const centerX = rect.width / 2
+    const centerY = rect.height / 2
+
+    const relativeX = (imageX - (contentRect.width / 2 / this.scale)) * this.scale
+    const relativeY = (imageY - (contentRect.height / 2 / this.scale)) * this.scale
+
+    const containerX = centerX + this.x + relativeX
+    const containerY = centerY + this.y + relativeY
+
+    return { x: containerX, y: containerY }
+  }
+
+  /**
+   * Center on specific image coordinates
+   * @param imageX - X coordinate in image
+   * @param imageY - Y coordinate in image
+   * @param useTransition - Whether to use transition animation (default: true if option is enabled)
+   */
+  public centerOnImagePoint(imageX: number, imageY: number, useTransition?: boolean): void {
+    const containerCoords = this.imageToContainer(imageX, imageY)
+    this.moveTo(containerCoords.x, containerCoords.y, useTransition)
   }
 
   /**
@@ -613,6 +767,7 @@ export class ImagePanZoom {
 
     if (this.transitionTimeout) {
       clearTimeout(this.transitionTimeout)
+      this.transitionTimeout = null
     }
 
     this.container.removeEventListener('wheel', this.boundWheel)
