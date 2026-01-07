@@ -1,5 +1,5 @@
 import { createImagePanZoom } from "../dist/image-pan-zoom.mjs";
-
+ 
 let panzoom;
 let isTransitionEnabled = true;
 const eventLog = document.getElementById("event-log");
