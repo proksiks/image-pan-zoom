@@ -84,6 +84,11 @@ export class ImagePanZoom {
 
   private init(): void {
     this.content.style.touchAction = 'none'
+    ;(this.content.style as any).userSelect = 'none'
+    ;(this.content.style as any).webkitUserSelect = 'none'
+    ;(this.content.style as any).MozUserSelect = 'none'
+    ;(this.content.style as any).msUserSelect = 'none'
+    ;(this.content.style as any)['-webkit-touch-callout'] = 'none'
     this.applyTransform()
     this.attachEvents()
   }

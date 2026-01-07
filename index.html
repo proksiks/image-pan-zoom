@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ImagePanZoom Demo</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    .demo-section {
+      margin: 30px 0;
+      text-align: center;
+    }
+
+    .zoom-container {
+      width: 100%;
+      max-width: 800px;
+      height: 500px;
+      margin: 20px auto;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      background-color: #fff;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .content {
+      max-width: none;
+      cursor: grab;
+    }
+
+    .content img {
+      user-select: none;
+    }
+
+    .content:active {
+      cursor: grabbing;
+    }
+
+    .controls {
+      margin: 20px 0;
+    }
+
+    button {
+      margin: 5px;
+      padding: 10px 15px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .instructions {
+      background-color: #e9ecef;
+      padding: 15px;
+      border-radius: 4px;
+      margin: 20px 0;
+      text-align: left;
+    }
+
+    .instructions h3 {
+      margin-top: 0;
+    }
+
+    .instructions ul {
+      padding-left: 20px;
+    }
+
+    .instructions li {
+      margin: 8px 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>ImagePanZoom Demo</h1>
+
+    <div class="instructions">
+      <h3>How to use:</h3>
+      <ul>
+        <li><strong>Zoom In/Out:</strong> Use mouse wheel to zoom in and out</li>
+        <li><strong>Pan:</strong> Click and drag to move around the image</li>
+        <li><strong>Double Click:</strong> Double click to zoom in at the clicked location</li>
+        <li><strong>Controls:</strong> Use the buttons below for additional functionality</li>
+      </ul>
+    </div>
+
+    <div class="demo-section">
+      <h2>Image Demo</h2>
+      <div class="zoom-container" id="image-container">
+        <div id="image-content" class="content">
+          <img draggable="false" src="https://img.goodfon.ru/wallpaper/nbig/c/c9/enot-vzgliad-voda-pogruzhenie-morda.webp"
+            alt="Zoomable image">
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="reset-btn">Reset</button>
+        <button id="rotate-btn">Rotate 90°</button>
+        <button id="zoom-in-btn">Zoom In</button>
+        <button id="zoom-out-btn">Zoom Out</button>
+      </div>
+
+      <div class="demo-section">
+        <h2>SVG Demo</h2>
+        <div class="zoom-container" id="svg-container">
+          <svg id="svg-content" class="content" width="1200" height="800">
+            <rect x="100" y="100" width="200" height="100" fill="#4CAF50" />
+            <circle cx="500" cy="300" r="80" fill="#2196F3" />
+            <polygon points="800,100 900,200 800,300 700,200" fill="#FF9800" />
+            <text x="100" y="400" font-family="Arial" font-size="30" fill="#673AB7">SVG Content</text>
+          </svg>
+        </div>
+
+        <div class="controls">
+          <button id="svg-reset-btn">Reset</button>
+          <button id="svg-rotate-btn">Rotate 90°</button>
+          <button id="svg-zoom-in-btn">Zoom In</button>
+          <button id="svg-zoom-out-btn">Zoom Out</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { createImagePanZoom } from './src/index.ts';
+
+      // Image demo
+      const imageContainer = document.getElementById('image-container');
+      const imageContent = document.getElementById('image-content');
+
+      const imagePanZoom = createImagePanZoom(imageContainer, imageContent, {
+        minScale: 0.1,
+        maxScale: 5,
+        initialScale: 0.8,
+        wheelZoomSpeed: 0.002,
+        boundsPadding: 0.1,
+        friction: 0.92,
+        maxSpeed: 300
+      });
+
+      // SVG demo
+      const svgContainer = document.getElementById('svg-container');
+      const svgContent = document.getElementById('svg-content');
+
+      const svgPanZoom = createImagePanZoom(svgContainer, svgContent, {
+        minScale: 0.1,
+        maxScale: 5,
+        initialScale: 0.5,
+        wheelZoomSpeed: 0.002,
+        boundsPadding: 0.1,
+        friction: 0.92,
+        maxSpeed: 300
+      });
+
+      // Image controls
+      document.getElementById('reset-btn').addEventListener('click', () => {
+        imagePanZoom.reset();
+      });
+
+      document.getElementById('rotate-btn').addEventListener('click', () => {
+        imagePanZoom.rotate(90);
+      });
+
+      document.getElementById('zoom-in-btn').addEventListener('click', () => {
+        const current = imagePanZoom.getTransform();
+        imagePanZoom.setTransform({ scale: current.scale * 1.2 });
+      });
+
+      document.getElementById('zoom-out-btn').addEventListener('click', () => {
+        const current = imagePanZoom.getTransform();
+        imagePanZoom.setTransform({ scale: current.scale * 0.8 });
+      });
+
+      // SVG controls
+      document.getElementById('svg-reset-btn').addEventListener('click', () => {
+        svgPanZoom.reset();
+      });
+
+      document.getElementById('svg-rotate-btn').addEventListener('click', () => {
+        svgPanZoom.rotate(90);
+      });
+
+      document.getElementById('svg-zoom-in-btn').addEventListener('click', () => {
+        const current = svgPanZoom.getTransform();
+        svgPanZoom.setTransform({ scale: current.scale * 1.2 });
+      });
+
+      document.getElementById('svg-zoom-out-btn').addEventListener('click', () => {
+        const current = svgPanZoom.getTransform();
+        svgPanZoom.setTransform({ scale: current.scale * 0.8 });
+      });
+    </script>
+</body>
+
+</html>
