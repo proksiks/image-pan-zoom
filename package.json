@@ -1,0 +1,49 @@
+{
+  "name": "zoomer",
+  "version": "1.0.0",
+  "description": "A lightweight library for pan and zoom functionality",
+  "main": "dist/image-pan-zoom.umd.js",
+  "module": "dist/image-pan-zoom.es.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/image-pan-zoom.es.js",
+      "require": "./dist/image-pan-zoom.umd.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/proksiks/zoomer.git"
+  },
+  "keywords": [
+    "zoom",
+    "pan",
+    "image",
+    "panzoom",
+    "scale",
+    "ui",
+    "javascript",
+    "typescript"
+  ],
+  "author": "Khliupnev Vladimir",
+  "license": "MIT",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/proksiks/zoomer/issues"
+  },
+  "homepage": "https://github.com/proksiks/zoomer#readme",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
+  }
+}
