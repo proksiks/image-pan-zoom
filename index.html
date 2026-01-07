@@ -50,6 +50,20 @@
       user-select: none;
     }
 
+    .content svg rect:hover,
+    .content svg polygon:hover,
+    .content svg circle:hover {
+      fill: skyblue;
+      cursor: pointer;
+    }
+
+    .content svg rect:active,
+    .content svg polygon:active,
+    .content svg circle:active {
+      fill: royalblue;
+      cursor: wait;
+    }
+
     .content:active {
       cursor: grabbing;
     }
@@ -113,7 +127,8 @@
       <h2>Image Demo</h2>
       <div class="zoom-container" id="image-container">
         <div id="image-content" class="content">
-          <img draggable="false" src="https://img.goodfon.ru/wallpaper/nbig/c/c9/enot-vzgliad-voda-pogruzhenie-morda.webp"
+          <img draggable="false"
+            src="https://img.goodfon.ru/wallpaper/nbig/c/c9/enot-vzgliad-voda-pogruzhenie-morda.webp"
             alt="Zoomable image">
         </div>
       </div>
@@ -128,12 +143,16 @@
       <div class="demo-section">
         <h2>SVG Demo</h2>
         <div class="zoom-container" id="svg-container">
-          <svg id="svg-content" class="content" width="1200" height="800">
-            <rect x="100" y="100" width="200" height="100" fill="#4CAF50" />
-            <circle cx="500" cy="300" r="80" fill="#2196F3" />
-            <polygon points="800,100 900,200 800,300 700,200" fill="#FF9800" />
-            <text x="100" y="400" font-family="Arial" font-size="30" fill="#673AB7">SVG Content</text>
-          </svg>
+          <div id="svg-content" class="content">
+            <svg width="2000" height="1200" draggable="false">
+              <rect x="100" y="100" width="200" height="100" fill="#4CAF50" />
+              <circle cx="500" cy="300" r="80" fill="#2196F3" />
+              <polygon points="800,100 900,200 800,300 700,200" fill="#FF9800" />
+              <rect x="300" y="850" width="200" height="100" fill="#4CAF50" />
+              <circle cx="680" cy="680" r="80" fill="#2196F3" />
+              <text x="100" y="400" font-family="Arial" font-size="30" fill="#673AB7">SVG TEXT</text>
+            </svg>
+          </div>
         </div>
 
         <div class="controls">
@@ -148,7 +167,6 @@
     <script type="module">
       import { createImagePanZoom } from './src/index.ts';
 
-      // Image demo
       const imageContainer = document.getElementById('image-container');
       const imageContent = document.getElementById('image-content');
 
@@ -160,9 +178,9 @@
         boundsPadding: 0.1,
         friction: 0.92,
         maxSpeed: 300,
+        transition: true
       });
 
-      // SVG demo
       const svgContainer = document.getElementById('svg-container');
       const svgContent = document.getElementById('svg-content');
 
@@ -176,7 +194,6 @@
         maxSpeed: 300
       });
 
-      // Image controls
       document.getElementById('reset-btn').addEventListener('click', () => {
         imagePanZoom.reset();
       });
@@ -195,7 +212,6 @@
         imagePanZoom.setTransform({ scale: current.scale * 0.8 });
       });
 
-      // SVG controls
       document.getElementById('svg-reset-btn').addEventListener('click', () => {
         svgPanZoom.reset();
       });
