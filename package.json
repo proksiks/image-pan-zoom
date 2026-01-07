@@ -1,6 +1,6 @@
 {
   "name": "zoomer",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "A lightweight library for pan and zoom functionality",
   "main": "dist/image-pan-zoom.umd.js",
   "module": "dist/image-pan-zoom.es.js",
