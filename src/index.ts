@@ -108,6 +108,12 @@ export class ImagePanZoom {
   private isTransitioning: boolean = false
   private transitionTimeout: number | null = null
 
+  private lastTouchEndTime: number = 0
+  private lastTouchX: number = 0
+  private lastTouchY: number = 0
+  private readonly DOUBLE_TAP_DELAY: number = 300 // ms
+  private readonly DOUBLE_TAP_THRESHOLD: number = 10 // pixels
+
   private boundWheel: (e: WheelEvent) => void
   private boundPointerDown: (e: PointerEvent) => void
   private boundPointerMove: (e: PointerEvent) => void
@@ -515,7 +521,6 @@ export class ImagePanZoom {
 
   private onTouchStart(e: TouchEvent): void {
     if (e.touches.length === 2) {
-
       e.preventDefault();
       this.stopAnimation();
       this.isPinching = true;
@@ -542,7 +547,6 @@ export class ImagePanZoom {
       this.isPanning = false;
       this.didMove = false;
     } else if (e.touches.length === 1) {
-
       const touch = e.touches[0];
       const syntheticEvent = new PointerEvent('pointerdown', {
         clientX: touch.clientX,
@@ -626,7 +630,70 @@ export class ImagePanZoom {
         this.onPointerUp(syntheticEvent);
       }
       this.isPinching = false;
+
+      this.handleDoubleTapCheck(e);
     }
+  }
+
+  /**
+   * Handle double tap detection for touch devices
+   * @param e - Touch event
+   */
+  private handleDoubleTapCheck(e: TouchEvent): void {
+    const now = Date.now();
+    const touch = e.changedTouches[0];
+
+    if (!touch) return;
+
+    const touchX = touch.clientX;
+    const touchY = touch.clientY;
+
+    // Check if this is a double tap
+    if (now - this.lastTouchEndTime < this.DOUBLE_TAP_DELAY &&
+      Math.abs(touchX - this.lastTouchX) < this.DOUBLE_TAP_THRESHOLD &&
+      Math.abs(touchY - this.lastTouchY) < this.DOUBLE_TAP_THRESHOLD) {
+
+      // It's a double tap!
+      this.handleDoubleTap(touchX, touchY);
+
+      // Reset to prevent triple tap, etc.
+      this.lastTouchEndTime = 0;
+      this.lastTouchX = 0;
+      this.lastTouchY = 0;
+    } else {
+      // Store for possible double tap
+      this.lastTouchEndTime = now;
+      this.lastTouchX = touchX;
+      this.lastTouchY = touchY;
+    }
+  }
+
+  /**
+   * Handle double tap zoom (similar to double click)
+   * @param clientX - X coordinate of the tap
+   * @param clientY - Y coordinate of the tap
+   */
+  private handleDoubleTap(clientX: number, clientY: number): void {
+    this.stopAnimation();
+    const rect = this.container.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const clickX = clientX - rect.left;
+    const clickY = clientY - rect.top;
+
+    const targetScale = Math.min(this.scale * 1.5, this.options.maxScale);
+    const scaleRatio = targetScale / this.scale;
+
+    const localX = clickX - centerX - this.x;
+    const localY = clickY - centerY - this.y;
+    this.scale = targetScale;
+
+    const newLocalX = localX * scaleRatio;
+    const newLocalY = localY * scaleRatio;
+    this.x += localX - newLocalX;
+    this.y += localY - newLocalY;
+
+    this.applyTransform(true);
   }
 
   /**
