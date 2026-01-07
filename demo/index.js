@@ -1,4 +1,4 @@
-import { createImagePanZoom } from "./dist/image-pan-zoom.mjs";
+import { createImagePanZoom } from "../dist/image-pan-zoom.mjs";
 
 let panzoom;
 let isTransitionEnabled = true;

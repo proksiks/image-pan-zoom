@@ -6,7 +6,8 @@
 .cache
 .netlify
 .npmrc
-# dist
+dist
+dist-demo
 
 # Node dependencies
 node_modules
