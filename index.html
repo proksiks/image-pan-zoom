@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImagePanZoom Demo</title>
+    <link rel="shortcut icon" href="./assets/favicon-DeMyL51D.svg" type="image/x-icon">
+  <script type="module" crossorigin src="./assets/index-DWH-qxQT.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BRS6p2Zw.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🖼️ ImagePanZoom Demo</h1>
+            <p class="subtitle">Демонстрация возможностей библиотеки панорамирования и масштабирования</p>
+        </header>
+
+        <div class="demo-wrapper">
+            <div class="image-container">
+                <div id="image-container">
+                    <img id="image" src="./assets/map-B0VfXlP_.svg" alt="Карта мира" draggable="false">
+                </div>
+            </div>
+
+            <div class="controls">
+                <h2>⚙️ Управление</h2>
+
+                <div class="toggle-switch">
+                    <span class="switch-label">Анимации (transition)</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-transition" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="control-group">
+                    <h3><i>↔️</i> Навигация</h3>
+                    <div class="btn-grid">
+                        <button onclick="moveTo(0, 0)" title="Центрировать">
+                            <span>🏠</span> Центр
+                        </button>
+                        <button onclick="moveBy(50, 0)" title="Вправо на 50px">
+                            <span>→</span> Вправо
+                        </button>
+                        <button onclick="moveBy(-50, 0)" title="Влево на 50px">
+                            <span>←</span> Влево
+                        </button>
+                        <button onclick="moveBy(0, 50)" title="Вниз на 50px">
+                            <span>↓</span> Вниз
+                        </button>
+                        <button onclick="moveBy(0, -50)" title="Вверх на 50px">
+                            <span>↑</span> Вверх
+                        </button>
+                    </div>
+
+                    <div class="input-group">
+                        <input type="number" id="move-x" placeholder="X координата" value="100">
+                        <input type="number" id="move-y" placeholder="Y координата" value="100">
+                        <button onclick="moveToCustom()" class="success">
+                            <span>🎯</span> Перейти
+                        </button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3><i>🔍</i> Масштабирование</h3>
+                    <div class="btn-grid">
+                        <button onclick="zoomTo(0.5)" title="Масштаб 0.5x">
+                            <span>➖</span> 0.5x
+                        </button>
+                        <button onclick="zoomTo(1)" title="Масштаб 1x">
+                            <span>🔍</span> 1x
+                        </button>
+                        <button onclick="zoomTo(2)" title="Масштаб 2x">
+                            <span>➕</span> 2x
+                        </button>
+                        <button onclick="zoomIn()" title="Увеличить">
+                            <span>➕</span> Увеличить
+                        </button>
+                        <button onclick="zoomOut()" title="Уменьшить">
+                            <span>➖</span> Уменьшить
+                        </button>
+                    </div>
+
+                    <div class="input-group">
+                        <input type="number" id="zoom-scale" placeholder="Масштаб" value="1.5" step="0.1" min="0.1"
+                            max="10">
+                        <button onclick="zoomToCustom()" class="success">
+                            <span>🎯</span> Масштабировать
+                        </button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3><i>🔄</i> Поворот</h3>
+                    <div class="btn-grid">
+                        <button onclick="rotateBy(-90)" title="Повернуть на -90°">
+                            <span>↪️</span> -90°
+                        </button>
+                        <button onclick="rotateBy(-45)" title="Повернуть на -45°">
+                            <span>↩️</span> -45°
+                        </button>
+                        <button onclick="rotateBy(45)" title="Повернуть на 45°">
+                            <span>↪️</span> +45°
+                        </button>
+                        <button onclick="rotateBy(90)" title="Повернуть на 90°">
+                            <span>↪️</span> +90°
+                        </button>
+                        <button onclick="rotateTo(0)" title="Сбросить поворот">
+                            <span>🔄</span> Сброс
+                        </button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3><i>🎯</i> Действия</h3>
+                    <div class="btn-grid">
+                        <button onclick="centerOnImagePointCustom()" class="warning">
+                            <span>🎯</span> Центрировать на точке
+                        </button>
+                        <button onclick="resetTransform()" class="secondary">
+                            <span>🔄</span> Сброс
+                        </button>
+                        <button onclick="getTransformState()" class="success">
+                            <span>📋</span> Состояние
+                        </button>
+                    </div>
+                </div>
+
+                <div class="instructions">
+                    <h3><span>💡</span> Инструкция</h3>
+                    <ul>
+                        <li><strong>Мышь:</strong> Перетаскивание для панорамирования, колесо для масштабирования</li>
+                        <li><strong>Сенсор:</strong> 2 пальца для масштабирования и панорамирования</li>
+                        <li><strong>Двойной клик:</strong> Увеличение в точке клика</li>
+                        <li><strong>Двойной тап:</strong> Увеличение в точке касания (на мобильных)</li>
+                        <li>Используйте кнопки справа для тестирования методов API</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <h2>📊 Текущее состояние</h2>
+            <div class="stats">
+                <div class="stat-item">
+                    <h3>Масштаб (scale)</h3>
+                    <div class="stat-value" id="scale-value">1.00</div>
+                </div>
+                <div class="stat-item">
+                    <h3>Позиция X</h3>
+                    <div class="stat-value" id="x-value">0.00</div>
+                </div>
+                <div class="stat-item">
+                    <h3>Позиция Y</h3>
+                    <div class="stat-value" id="y-value">0.00</div>
+                </div>
+                <div class="stat-item">
+                    <h3>Поворот</h3>
+                    <div class="stat-value" id="rotation-value">0°</div>
+                </div>
+            </div>
+
+            <div class="event-log" id="event-log">
+                <div class="event-item">Готов к работе...</div>
+            </div>
+        </div>
+
+        <footer>
+            <p>ImagePanZoom v1.0 | Демонстрация новых возможностей</p>
+            <sup>
+                <small>
+                    Доступные методы: moveTo(), moveBy(), zoomTo(), rotate(), reset(), getTransform(), setTransform(),
+                    centerOnImagePoint()
+                </small>
+            </sup>
+        </footer>
+    </div>
+
+</body>
+
+</html>
