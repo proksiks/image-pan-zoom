@@ -123,14 +123,14 @@ export class ImagePanZoom {
   private boundTouchMove: (e: TouchEvent) => void
   private boundTouchEnd: (e: TouchEvent) => void
 
-/*************  ✨ Windsurf Command ⭐  *************/
+
   /**
    * Creates a new ImagePanZoom instance.
    * @param {HTMLElement} container - The container element that will hold the zoomable content.
    * @param {HTMLElement} content - The content element that will be zoomed and panned.
    * @param {ImagePanZoomOptions} options - The options for configuring the ImagePanZoom behavior.
    */
-/*******  2821c5cf-6f63-4a97-abf1-b03f051815b0  *******/
+
   constructor(container: HTMLElement, content: HTMLElement, options: ImagePanZoomOptions = {}) {
     this.container = container
     this.content = content
@@ -179,12 +179,12 @@ export class ImagePanZoom {
     this.attachEvents()
   }
 
-/*************  ✨ Windsurf Command ⭐  *************/
+
   /**
    * Attaches event listeners to the container and content elements for wheel, pointer and touch events.
    * Passive event listeners are used to prevent the default behavior of the events from being triggered.
    */
-/*******  7bb5e012-617f-472b-8df4-73786e325b59  *******/
+
   private attachEvents(): void {
     this.container.addEventListener('wheel', this.boundWheel, { passive: false })
     this.content.addEventListener('pointerdown', this.boundPointerDown)
@@ -227,14 +227,14 @@ export class ImagePanZoom {
     }
   }
 
-/*************  ✨ Windsurf Command ⭐  *************/
+
   /**
    * Clamp the given x and y coordinates to the nearest valid position within the container bounds
    * @param {number} nextX - The x coordinate to clamp
    * @param {number} nextY - The y coordinate to clamp
    * @returns {Object} - An object containing the clamped x and y coordinates
    */
-/*******  a318a30a-a86f-4dc3-95ff-2e595e6d8feb  *******/
+
   private clampPosition(nextX: number, nextY: number): { x: number; y: number } {
     const contRect = this.container.getBoundingClientRect()
     const contW = contRect.width
@@ -281,14 +281,14 @@ export class ImagePanZoom {
     return { x: clampedX, y: clampedY }
   }
 
-/*************  ✨ Windsurf Command ⭐  *************/
+
   /**
    * Applies the current transformation to the content element.
    * If the transition option is enabled and useTransition is true, applies a transition to the content element.
    * If useTransition is false, removes any transition from the content element.
    * @param {boolean} useTransition - Whether to apply a transition to the content element
    */
-/*******  771e736d-0b20-43b2-84a0-49873bf01a09  *******/
+
   private applyTransform(useTransition: boolean = false): void {
     this.container.style.overflow = 'hidden'
     if (!this.container.style.position) {
@@ -325,13 +325,13 @@ export class ImagePanZoom {
     this.content.style.transform = `translate(-50%, -50%) translate(${this.x}px, ${this.y}px) rotate(${this.rotation}deg) scale(${this.scale})`
   }
 
-/*************  ✨ Windsurf Command ⭐  *************/
+
   /**
    * Clamp the given scale value to the nearest valid scale value within the max and min scale options
    * @param {number} next - The scale value to clamp
    * @returns {number} - The clamped scale value
    */
-/*******  bbba5fd8-0361-40ab-ba28-7f49b09ad704  *******/
+
   private clampScale(next: number): number {
     return Math.min(this.options.maxScale, Math.max(this.options.minScale, next))
   }
@@ -452,16 +452,16 @@ export class ImagePanZoom {
     this.applyTransform(shouldUseTransition && this.options.transition)
   }
 
-/*************  ✨ Windsurf Command ⭐  *************/
-/**
- * Animates the kinetic movement of the image based on the current velocity.
- * This function is called recursively using requestAnimationFrame until the velocity
- * is too low to continue animating.
- * The animation is stopped by calling stopAnimation() and applying the
- * final transform without animation.
- * @private
- */
-/*******  caac7aaf-53ea-4767-91a1-5ad0178ecc96  *******/
+
+  /**
+   * Animates the kinetic movement of the image based on the current velocity.
+   * This function is called recursively using requestAnimationFrame until the velocity
+   * is too low to continue animating.
+   * The animation is stopped by calling stopAnimation() and applying the
+   * final transform without animation.
+   * @private
+   */
+
   private animateKinetic(): void {
     if (Math.abs(this.velocityX) < 0.5 && Math.abs(this.velocityY) < 0.5 && Math.abs(this.velocityScale) < 0.001) {
       this.stopAnimation()
@@ -483,12 +483,12 @@ export class ImagePanZoom {
     this.animationFrameId = requestAnimationFrame(this.animateKinetic)
   }
 
-/*************  ✨ Windsurf Command ⭐  *************/
+
   /**
    * Handles wheel event to zoom image.
    * @param e - Wheel event object.
    */
-/*******  808c04f4-5c8e-4098-9478-b715ea89d7bb  *******/
+
   private onWheel(e: WheelEvent): void {
     e.preventDefault()
     this.stopAnimation()
@@ -526,13 +526,13 @@ export class ImagePanZoom {
     this.content.setPointerCapture(e.pointerId)
   }
 
-/*************  ✨ Windsurf Command ⭐  *************/
+
   /**
    * Handles pointer move event while panning.
    * Calculates velocity and scales the image accordingly.
    * @param e - Pointer move event object.
    */
-/*******  bd93d2af-2603-4a91-a2dd-44b40cae3714  *******/
+
   private onPointerMove(e: PointerEvent): void {
     if (!this.isPanning) return
 
@@ -691,14 +691,14 @@ export class ImagePanZoom {
     }
   }
 
-/*************  ✨ Windsurf Command ⭐  *************/
+
   /**
    * Handles touch end event.
    * If the event is triggered because the user has stopped pinching, it calculates the velocity of the pan gesture and starts an animation to smoothly stop the pan gesture.
    * If the event is triggered because the user has lifted their finger off the screen, it checks if the event is a double tap and handles it accordingly.
    * @param e - Touch end event object.
    */
-/*******  184e4d3f-a152-48b3-b00f-7be5f473cbe8  *******/
+
   private onTouchEnd(e: TouchEvent): void {
     if (this.isPinching && e.touches.length < 2) {
       this.isPinching = false;
