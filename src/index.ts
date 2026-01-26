@@ -111,8 +111,8 @@ export class ImagePanZoom {
   private lastTouchEndTime: number = 0
   private lastTouchX: number = 0
   private lastTouchY: number = 0
-  private readonly DOUBLE_TAP_DELAY: number = 300 // ms
-  private readonly DOUBLE_TAP_THRESHOLD: number = 10 // pixels
+  private readonly DOUBLE_TAP_DELAY: number = 300
+  private readonly DOUBLE_TAP_THRESHOLD: number = 10
 
   private boundWheel: (e: WheelEvent) => void
   private boundPointerDown: (e: PointerEvent) => void
@@ -123,6 +123,14 @@ export class ImagePanZoom {
   private boundTouchMove: (e: TouchEvent) => void
   private boundTouchEnd: (e: TouchEvent) => void
 
+/*************  ✨ Windsurf Command ⭐  *************/
+  /**
+   * Creates a new ImagePanZoom instance.
+   * @param {HTMLElement} container - The container element that will hold the zoomable content.
+   * @param {HTMLElement} content - The content element that will be zoomed and panned.
+   * @param {ImagePanZoomOptions} options - The options for configuring the ImagePanZoom behavior.
+   */
+/*******  2821c5cf-6f63-4a97-abf1-b03f051815b0  *******/
   constructor(container: HTMLElement, content: HTMLElement, options: ImagePanZoomOptions = {}) {
     this.container = container
     this.content = content
@@ -171,6 +179,12 @@ export class ImagePanZoom {
     this.attachEvents()
   }
 
+/*************  ✨ Windsurf Command ⭐  *************/
+  /**
+   * Attaches event listeners to the container and content elements for wheel, pointer and touch events.
+   * Passive event listeners are used to prevent the default behavior of the events from being triggered.
+   */
+/*******  7bb5e012-617f-472b-8df4-73786e325b59  *******/
   private attachEvents(): void {
     this.container.addEventListener('wheel', this.boundWheel, { passive: false })
     this.content.addEventListener('pointerdown', this.boundPointerDown)
@@ -196,37 +210,69 @@ export class ImagePanZoom {
 
     const rawW = this.content.offsetWidth
     const rawH = this.content.offsetHeight
-    const w = rawW * this.scale
-    const h = rawH * this.scale
 
-    return { contW, contH, pad, w, h }
+    const rad = this.rotation * Math.PI / 180
+    const cos = Math.cos(rad)
+    const sin = Math.sin(rad)
+
+    const rotatedW = Math.abs(rawW * this.scale * cos) + Math.abs(rawH * this.scale * sin)
+    const rotatedH = Math.abs(rawW * this.scale * sin) + Math.abs(rawH * this.scale * cos)
+
+    return {
+      contW,
+      contH,
+      pad,
+      w: rotatedW,
+      h: rotatedH
+    }
   }
 
+/*************  ✨ Windsurf Command ⭐  *************/
+  /**
+   * Clamp the given x and y coordinates to the nearest valid position within the container bounds
+   * @param {number} nextX - The x coordinate to clamp
+   * @param {number} nextY - The y coordinate to clamp
+   * @returns {Object} - An object containing the clamped x and y coordinates
+   */
+/*******  a318a30a-a86f-4dc3-95ff-2e595e6d8feb  *******/
   private clampPosition(nextX: number, nextY: number): { x: number; y: number } {
-    const { contW, contH, pad, w, h } = this.getSizes()
+    const contRect = this.container.getBoundingClientRect()
+    const contW = contRect.width
+    const contH = contRect.height
+    const pad = Math.min(contW, contH) * this.options.boundsPadding
 
-    const fitsHorizontally = w <= contW
-    const fitsVertically = h <= contH
+    const rawW = this.content.offsetWidth
+    const rawH = this.content.offsetHeight
+
+    const rad = this.rotation * Math.PI / 180
+    const cos = Math.cos(rad)
+    const sin = Math.sin(rad)
+
+    const rotatedW = Math.abs(rawW * this.scale * cos) + Math.abs(rawH * this.scale * sin)
+    const rotatedH = Math.abs(rawW * this.scale * sin) + Math.abs(rawH * this.scale * cos)
+
+    const fitsHorizontally = rotatedW <= contW
+    const fitsVertically = rotatedH <= contH
 
     let minX: number, maxX: number, minY: number, maxY: number
     if (fitsHorizontally) {
       minX = maxX = 0
     } else {
       const halfContW = contW / 2
-      const halfW = w / 2
+      const halfRotatedW = rotatedW / 2
 
-      maxX = halfW - halfContW + pad
-      minX = -(halfW - halfContW) - pad
+      maxX = halfRotatedW - halfContW + pad
+      minX = -(halfRotatedW - halfContW) - pad
     }
 
     if (fitsVertically) {
       minY = maxY = 0
     } else {
       const halfContH = contH / 2
-      const halfH = h / 2
+      const halfRotatedH = rotatedH / 2
 
-      maxY = halfH - halfContH + pad
-      minY = -(halfH - halfContH) - pad
+      maxY = halfRotatedH - halfContH + pad
+      minY = -(halfRotatedH - halfContH) - pad
     }
 
     const clampedX = fitsHorizontally ? 0 : Math.min(maxX, Math.max(minX, nextX))
@@ -235,6 +281,14 @@ export class ImagePanZoom {
     return { x: clampedX, y: clampedY }
   }
 
+/*************  ✨ Windsurf Command ⭐  *************/
+  /**
+   * Applies the current transformation to the content element.
+   * If the transition option is enabled and useTransition is true, applies a transition to the content element.
+   * If useTransition is false, removes any transition from the content element.
+   * @param {boolean} useTransition - Whether to apply a transition to the content element
+   */
+/*******  771e736d-0b20-43b2-84a0-49873bf01a09  *******/
   private applyTransform(useTransition: boolean = false): void {
     this.container.style.overflow = 'hidden'
     if (!this.container.style.position) {
@@ -271,9 +325,17 @@ export class ImagePanZoom {
     this.content.style.transform = `translate(-50%, -50%) translate(${this.x}px, ${this.y}px) rotate(${this.rotation}deg) scale(${this.scale})`
   }
 
+/*************  ✨ Windsurf Command ⭐  *************/
+  /**
+   * Clamp the given scale value to the nearest valid scale value within the max and min scale options
+   * @param {number} next - The scale value to clamp
+   * @returns {number} - The clamped scale value
+   */
+/*******  bbba5fd8-0361-40ab-ba28-7f49b09ad704  *******/
   private clampScale(next: number): number {
     return Math.min(this.options.maxScale, Math.max(this.options.minScale, next))
   }
+
 
   private stopAnimation(): void {
     if (this.animationFrameId !== null) {
@@ -281,6 +343,7 @@ export class ImagePanZoom {
       this.animationFrameId = null
     }
   }
+
 
   private zoomToPoint(clientX: number, clientY: number, deltaScale: number): void {
     const rect = this.container.getBoundingClientRect()
@@ -389,7 +452,17 @@ export class ImagePanZoom {
     this.applyTransform(shouldUseTransition && this.options.transition)
   }
 
-  private animateKinetic = (): void => {
+/*************  ✨ Windsurf Command ⭐  *************/
+/**
+ * Animates the kinetic movement of the image based on the current velocity.
+ * This function is called recursively using requestAnimationFrame until the velocity
+ * is too low to continue animating.
+ * The animation is stopped by calling stopAnimation() and applying the
+ * final transform without animation.
+ * @private
+ */
+/*******  caac7aaf-53ea-4767-91a1-5ad0178ecc96  *******/
+  private animateKinetic(): void {
     if (Math.abs(this.velocityX) < 0.5 && Math.abs(this.velocityY) < 0.5 && Math.abs(this.velocityScale) < 0.001) {
       this.stopAnimation()
       this.applyTransform(false)
@@ -410,6 +483,12 @@ export class ImagePanZoom {
     this.animationFrameId = requestAnimationFrame(this.animateKinetic)
   }
 
+/*************  ✨ Windsurf Command ⭐  *************/
+  /**
+   * Handles wheel event to zoom image.
+   * @param e - Wheel event object.
+   */
+/*******  808c04f4-5c8e-4098-9478-b715ea89d7bb  *******/
   private onWheel(e: WheelEvent): void {
     e.preventDefault()
     this.stopAnimation()
@@ -447,6 +526,13 @@ export class ImagePanZoom {
     this.content.setPointerCapture(e.pointerId)
   }
 
+/*************  ✨ Windsurf Command ⭐  *************/
+  /**
+   * Handles pointer move event while panning.
+   * Calculates velocity and scales the image accordingly.
+   * @param e - Pointer move event object.
+   */
+/*******  bd93d2af-2603-4a91-a2dd-44b40cae3714  *******/
   private onPointerMove(e: PointerEvent): void {
     if (!this.isPanning) return
 
@@ -483,6 +569,7 @@ export class ImagePanZoom {
     this.applyTransform(false)
   }
 
+
   private onPointerUp(e: PointerEvent): void {
     if (!this.isPanning) return
     this.isPanning = false
@@ -495,6 +582,7 @@ export class ImagePanZoom {
       this.animationFrameId = requestAnimationFrame(this.animateKinetic)
     }
   }
+
 
   private onDoubleClick(e: MouseEvent): void {
     this.stopAnimation()
@@ -518,6 +606,7 @@ export class ImagePanZoom {
 
     this.applyTransform(true)
   }
+
 
   private onTouchStart(e: TouchEvent): void {
     if (e.touches.length === 2) {
@@ -556,6 +645,7 @@ export class ImagePanZoom {
       this.onPointerDown(syntheticEvent);
     }
   }
+
 
   private onTouchMove(e: TouchEvent): void {
     if (e.touches.length === 2 && this.isPinching) {
@@ -601,6 +691,14 @@ export class ImagePanZoom {
     }
   }
 
+/*************  ✨ Windsurf Command ⭐  *************/
+  /**
+   * Handles touch end event.
+   * If the event is triggered because the user has stopped pinching, it calculates the velocity of the pan gesture and starts an animation to smoothly stop the pan gesture.
+   * If the event is triggered because the user has lifted their finger off the screen, it checks if the event is a double tap and handles it accordingly.
+   * @param e - Touch end event object.
+   */
+/*******  184e4d3f-a152-48b3-b00f-7be5f473cbe8  *******/
   private onTouchEnd(e: TouchEvent): void {
     if (this.isPinching && e.touches.length < 2) {
       this.isPinching = false;
@@ -648,20 +746,16 @@ export class ImagePanZoom {
     const touchX = touch.clientX;
     const touchY = touch.clientY;
 
-    // Check if this is a double tap
     if (now - this.lastTouchEndTime < this.DOUBLE_TAP_DELAY &&
       Math.abs(touchX - this.lastTouchX) < this.DOUBLE_TAP_THRESHOLD &&
       Math.abs(touchY - this.lastTouchY) < this.DOUBLE_TAP_THRESHOLD) {
 
-      // It's a double tap!
       this.handleDoubleTap(touchX, touchY);
 
-      // Reset to prevent triple tap, etc.
       this.lastTouchEndTime = 0;
       this.lastTouchX = 0;
       this.lastTouchY = 0;
     } else {
-      // Store for possible double tap
       this.lastTouchEndTime = now;
       this.lastTouchX = touchX;
       this.lastTouchY = touchY;
@@ -765,11 +859,20 @@ export class ImagePanZoom {
     const centerX = rect.width / 2
     const centerY = rect.height / 2
 
+    const rawW = this.content.offsetWidth
+    const rawH = this.content.offsetHeight
+    const rad = this.rotation * Math.PI / 180
+    const cos = Math.cos(rad)
+    const sin = Math.sin(rad)
+
+    const rotatedW = Math.abs(rawW * this.scale * cos) + Math.abs(rawH * this.scale * sin)
+    const rotatedH = Math.abs(rawW * this.scale * sin) + Math.abs(rawH * this.scale * cos)
+
     return {
-      left: centerX + this.x,
-      top: centerY + this.y,
-      right: centerX + this.x,
-      bottom: centerY + this.y
+      left: centerX + this.x - rotatedW / 2,
+      top: centerY + this.y - rotatedH / 2,
+      right: centerX + this.x + rotatedW / 2,
+      bottom: centerY + this.y + rotatedH / 2
     }
   }
 
