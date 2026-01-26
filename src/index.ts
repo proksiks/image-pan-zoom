@@ -43,6 +43,22 @@ export interface ImagePanZoomOptions {
    * Speed for pinch zoom (default: 1)
    */
   pinchSpeed?: number
+  /**
+   * Enable elastic (rubber band) effect at boundaries (default: true)
+   */
+  elastic?: boolean
+  /**
+   * Elastic resistance factor (default: 0.15)
+   */
+  elasticResistance?: number
+  /**
+   * Elastic bounce factor (default: 0.3)
+   */
+  elasticBounce?: number
+  /**
+   * Minimum elastic distance (default: 5)
+   */
+  minElasticDistance?: number
 }
 
 /**
@@ -65,6 +81,56 @@ export interface Transform {
    * Rotation angle in degrees
    */
   rotation: number
+}
+
+/**
+ * Represents element sizes and boundaries
+ */
+export interface ElementSizes {
+  /**
+   * Container width
+   */
+  containerWidth: number
+  /**
+   * Container height
+   */
+  containerHeight: number
+  /**
+   * Padding for boundaries
+   */
+  boundsPadding: number
+  /**
+   * Scaled and rotated content width
+   */
+  contentWidth: number
+  /**
+   * Scaled and rotated content height
+   */
+  contentHeight: number
+  /**
+   * Whether content fits horizontally
+   */
+  fitsHorizontally: boolean
+  /**
+   * Whether content fits vertically
+   */
+  fitsVertically: boolean
+  /**
+   * Minimum X position
+   */
+  minX: number
+  /**
+   * Maximum X position
+   */
+  maxX: number
+  /**
+   * Minimum Y position
+   */
+  minY: number
+  /**
+   * Maximum Y position
+   */
+  maxY: number
 }
 
 export class ImagePanZoom {
@@ -114,6 +180,11 @@ export class ImagePanZoom {
   private readonly DOUBLE_TAP_DELAY: number = 300
   private readonly DOUBLE_TAP_THRESHOLD: number = 10
 
+  private elasticX: number = 0
+  private elasticY: number = 0
+  private isAnimatingElastic: boolean = false
+  private elasticAnimationId: number | null = null
+
   private boundWheel: (e: WheelEvent) => void
   private boundPointerDown: (e: PointerEvent) => void
   private boundPointerMove: (e: PointerEvent) => void
@@ -125,10 +196,10 @@ export class ImagePanZoom {
 
 
   /**
-   * Creates a new ImagePanZoom instance.
-   * @param {HTMLElement} container - The container element that will hold the zoomable content.
-   * @param {HTMLElement} content - The content element that will be zoomed and panned.
-   * @param {ImagePanZoomOptions} options - The options for configuring the ImagePanZoom behavior.
+   * Constructor for ImagePanZoom class
+   * @param {HTMLElement} container - The container element that contains the zoomable content
+   * @param {HTMLElement} content - The content element that is being zoomed
+   * @param {ImagePanZoomOptions} options - Options for the zooming behavior
    */
 
   constructor(container: HTMLElement, content: HTMLElement, options: ImagePanZoomOptions = {}) {
@@ -144,6 +215,10 @@ export class ImagePanZoom {
       maxSpeed: options.maxSpeed ?? 300,
       transition: options.transition ?? false,
       pinchSpeed: options.pinchSpeed ?? 1,
+      elastic: options.elastic ?? true,
+      elasticResistance: options.elasticResistance ?? 0.15,
+      elasticBounce: options.elasticBounce ?? 0.3,
+      minElasticDistance: options.minElasticDistance ?? 5,
     }
 
     this.scale = this.options.initialScale
@@ -166,10 +241,6 @@ export class ImagePanZoom {
 
   /**
    * Initializes the pan and zoom functionality.
-   * Sets touch-action and user-select CSS properties on the content element.
-   * If transition is enabled, sets the transition CSS property on the content element.
-   * Applies the initial transform to the content element.
-   * Attaches wheel, pointerdown, pointermove, and pointerup event listeners.
    */
   private init(): void {
     this.content.style.touchAction = 'none'
@@ -179,19 +250,12 @@ export class ImagePanZoom {
     this.attachEvents()
   }
 
-
-  /**
-   * Attaches event listeners to the container and content elements for wheel, pointer and touch events.
-   * Passive event listeners are used to prevent the default behavior of the events from being triggered.
-   */
-
   private attachEvents(): void {
     this.container.addEventListener('wheel', this.boundWheel, { passive: false })
     this.content.addEventListener('pointerdown', this.boundPointerDown)
     this.content.addEventListener('dblclick', this.boundDoubleClick)
     window.addEventListener('pointermove', this.boundPointerMove)
     window.addEventListener('pointerup', this.boundPointerUp)
-
 
     this.container.addEventListener('touchstart', this.boundTouchStart, { passive: false })
     this.container.addEventListener('touchmove', this.boundTouchMove, { passive: false })
@@ -200,9 +264,8 @@ export class ImagePanZoom {
 
   /**
    * Calculate and return the sizes of container and content elements
-   * @returns Object containing container width/height, padding, and scaled content dimensions
    */
-  private getSizes() {
+  public getSizes(): ElementSizes {
     const contRect = this.container.getBoundingClientRect()
     const contW = contRect.width
     const contH = contRect.height
@@ -212,44 +275,11 @@ export class ImagePanZoom {
     const rawH = this.content.offsetHeight
 
     const rad = this.rotation * Math.PI / 180
-    const cos = Math.cos(rad)
-    const sin = Math.sin(rad)
+    const cos = Math.abs(Math.cos(rad))
+    const sin = Math.abs(Math.sin(rad))
 
-    const rotatedW = Math.abs(rawW * this.scale * cos) + Math.abs(rawH * this.scale * sin)
-    const rotatedH = Math.abs(rawW * this.scale * sin) + Math.abs(rawH * this.scale * cos)
-
-    return {
-      contW,
-      contH,
-      pad,
-      w: rotatedW,
-      h: rotatedH
-    }
-  }
-
-
-  /**
-   * Clamp the given x and y coordinates to the nearest valid position within the container bounds
-   * @param {number} nextX - The x coordinate to clamp
-   * @param {number} nextY - The y coordinate to clamp
-   * @returns {Object} - An object containing the clamped x and y coordinates
-   */
-
-  private clampPosition(nextX: number, nextY: number): { x: number; y: number } {
-    const contRect = this.container.getBoundingClientRect()
-    const contW = contRect.width
-    const contH = contRect.height
-    const pad = Math.min(contW, contH) * this.options.boundsPadding
-
-    const rawW = this.content.offsetWidth
-    const rawH = this.content.offsetHeight
-
-    const rad = this.rotation * Math.PI / 180
-    const cos = Math.cos(rad)
-    const sin = Math.sin(rad)
-
-    const rotatedW = Math.abs(rawW * this.scale * cos) + Math.abs(rawH * this.scale * sin)
-    const rotatedH = Math.abs(rawW * this.scale * sin) + Math.abs(rawH * this.scale * cos)
+    const rotatedW = rawW * this.scale * cos + rawH * this.scale * sin
+    const rotatedH = rawW * this.scale * sin + rawH * this.scale * cos
 
     const fitsHorizontally = rotatedW <= contW
     const fitsVertically = rotatedH <= contH
@@ -275,19 +305,100 @@ export class ImagePanZoom {
       minY = -(halfRotatedH - halfContH) - pad
     }
 
-    const clampedX = fitsHorizontally ? 0 : Math.min(maxX, Math.max(minX, nextX))
-    const clampedY = fitsVertically ? 0 : Math.min(maxY, Math.max(minY, nextY))
+    return {
+      containerWidth: contW,
+      containerHeight: contH,
+      boundsPadding: pad,
+      contentWidth: rotatedW,
+      contentHeight: rotatedH,
+      fitsHorizontally,
+      fitsVertically,
+      minX,
+      maxX,
+      minY,
+      maxY
+    }
+  }
+
+  /**
+   * Calculate boundaries with optional elastic effect
+   */
+  private calculateBoundaries(useElastic: boolean = false): { minX: number, maxX: number, minY: number, maxY: number } {
+    const sizes = this.getSizes()
+
+    if (!useElastic || !this.options.elastic) {
+      return {
+        minX: sizes.minX,
+        maxX: sizes.maxX,
+        minY: sizes.minY,
+        maxY: sizes.maxY
+      }
+    }
+
+    let minX = sizes.minX
+    let maxX = sizes.maxX
+    let minY = sizes.minY
+    let maxY = sizes.maxY
+
+    if (sizes.fitsHorizontally && sizes.fitsVertically) {
+      return { minX, maxX, minY, maxY }
+    }
+
+    const currentX = this.x + this.elasticX
+    const currentY = this.y + this.elasticY
+
+    if (!sizes.fitsHorizontally) {
+      if (currentX < minX) {
+        const overshoot = minX - currentX
+        this.elasticX = -this.calculateElasticOffset(overshoot)
+      } else if (currentX > maxX) {
+        const overshoot = currentX - maxX
+        this.elasticX = this.calculateElasticOffset(overshoot)
+      } else {
+        this.elasticX *= this.options.elasticResistance
+      }
+    }
+
+    if (!sizes.fitsVertically) {
+      if (currentY < minY) {
+        const overshoot = minY - currentY
+        this.elasticY = -this.calculateElasticOffset(overshoot)
+      } else if (currentY > maxY) {
+        const overshoot = currentY - maxY
+        this.elasticY = this.calculateElasticOffset(overshoot)
+      } else {
+        this.elasticY *= this.options.elasticResistance
+      }
+    }
+
+    return {
+      minX: minX - this.elasticX,
+      maxX: maxX - this.elasticX,
+      minY: minY - this.elasticY,
+      maxY: maxY - this.elasticY
+    }
+  }
+
+  /**
+   * Calculate elastic offset using easeOutBounce-like function
+   */
+  private calculateElasticOffset(overshoot: number): number {
+    if (overshoot < this.options.minElasticDistance) {
+      return overshoot * this.options.elasticResistance
+    }
+
+    const normalized = overshoot / 100
+    return overshoot * this.options.elasticResistance * (1 - Math.exp(-normalized))
+  }
+
+  private clampPosition(nextX: number, nextY: number, useElastic: boolean = false): { x: number; y: number } {
+    const bounds = this.calculateBoundaries(useElastic)
+
+    const clampedX = Math.min(bounds.maxX, Math.max(bounds.minX, nextX))
+    const clampedY = Math.min(bounds.maxY, Math.max(bounds.minY, nextY))
 
     return { x: clampedX, y: clampedY }
   }
-
-
-  /**
-   * Applies the current transformation to the content element.
-   * If the transition option is enabled and useTransition is true, applies a transition to the content element.
-   * If useTransition is false, removes any transition from the content element.
-   * @param {boolean} useTransition - Whether to apply a transition to the content element
-   */
 
   private applyTransform(useTransition: boolean = false): void {
     this.container.style.overflow = 'hidden'
@@ -301,9 +412,12 @@ export class ImagePanZoom {
     this.content.style.left = '50%'
     this.content.style.transformOrigin = '50% 50%'
 
-    const clamped = this.clampPosition(this.x, this.y)
+    const clamped = this.clampPosition(this.x, this.y, false)
     this.x = clamped.x
     this.y = clamped.y
+
+    this.elasticX = 0
+    this.elasticY = 0
 
     if (this.options.transition && useTransition && !this.isTransitioning) {
       this.content.style.transition = `transform ${this.transitionDuration}ms ${this.transitionEasing}`
@@ -322,25 +436,81 @@ export class ImagePanZoom {
       this.isTransitioning = false
     }
 
-    this.content.style.transform = `translate(-50%, -50%) translate(${this.x}px, ${this.y}px) rotate(${this.rotation}deg) scale(${this.scale})`
+    const totalX = this.x + this.elasticX
+    const totalY = this.y + this.elasticY
+
+    this.content.style.transform = `translate(-50%, -50%) translate(${totalX}px, ${totalY}px) rotate(${this.rotation}deg) scale(${this.scale})`
+  }
+
+  /**
+   * Apply elastic bounce animation when released
+   */
+  private animateElasticReturn(): void {
+    if (this.isAnimatingElastic || !this.options.elastic) return
+
+    const sizes = this.getSizes()
+    const bounds = this.calculateBoundaries(false)
+
+    const needsBounceX = !sizes.fitsHorizontally && (this.x < bounds.minX || this.x > bounds.maxX)
+    const needsBounceY = !sizes.fitsVertically && (this.y < bounds.minY || this.y > bounds.maxY)
+
+    if (!needsBounceX && !needsBounceY) return
+
+    this.isAnimatingElastic = true
+    this.stopAnimation()
+
+    const startX = this.x
+    const startY = this.y
+    const targetX = Math.min(bounds.maxX, Math.max(bounds.minX, startX))
+    const targetY = Math.min(bounds.maxY, Math.max(bounds.minY, startY))
+
+    const startTime = Date.now()
+    const duration = 300
+
+    const animate = () => {
+      const now = Date.now()
+      const elapsed = now - startTime
+      const progress = Math.min(elapsed / duration, 1)
+
+      const easedProgress = 1 - Math.pow(1 - progress, 3)
+
+      this.x = startX + (targetX - startX) * easedProgress
+      this.y = startY + (targetY - startY) * easedProgress
+
+      this.applyTransform(false)
+
+      if (progress < 1) {
+        this.elasticAnimationId = requestAnimationFrame(animate)
+      } else {
+        this.isAnimatingElastic = false
+        this.elasticAnimationId = null
+      }
+    }
+
+    this.elasticAnimationId = requestAnimationFrame(animate)
   }
 
 
   /**
-   * Clamp the given scale value to the nearest valid scale value within the max and min scale options
-   * @param {number} next - The scale value to clamp
-   * @returns {number} - The clamped scale value
+   * Clamp the given scale to the range of [minScale, maxScale]
+   * @param {number} next - the scale to be clamped
+   * @returns {number} the clamped scale
    */
 
   private clampScale(next: number): number {
     return Math.min(this.options.maxScale, Math.max(this.options.minScale, next))
   }
 
-
   private stopAnimation(): void {
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId)
       this.animationFrameId = null
+    }
+
+    if (this.elasticAnimationId !== null) {
+      cancelAnimationFrame(this.elasticAnimationId)
+      this.elasticAnimationId = null
+      this.isAnimatingElastic = false
     }
   }
 
@@ -368,14 +538,15 @@ export class ImagePanZoom {
     this.x += localX - newLocalX
     this.y += localY - newLocalY
 
+    const clamped = this.clampPosition(this.x, this.y, true)
+    this.x = clamped.x
+    this.y = clamped.y
+
     this.applyTransform(false)
   }
 
   /**
    * Move the center of the view to the specified coordinates
-   * @param targetX - Target X coordinate in container pixels
-   * @param targetY - Target Y coordinate in container pixels
-   * @param useTransition - Whether to use transition animation (default: true if option is enabled)
    */
   public moveTo(targetX: number, targetY: number, useTransition?: boolean): void {
     this.stopAnimation()
@@ -387,7 +558,7 @@ export class ImagePanZoom {
     this.x = targetX - centerX
     this.y = targetY - centerY
 
-    const clamped = this.clampPosition(this.x, this.y)
+    const clamped = this.clampPosition(this.x, this.y, false)
     this.x = clamped.x
     this.y = clamped.y
 
@@ -397,9 +568,6 @@ export class ImagePanZoom {
 
   /**
    * Move by specified delta values
-   * @param deltaX - Delta X to move by
-   * @param deltaY - Delta Y to move by
-   * @param useTransition - Whether to use transition animation (default: true if option is enabled)
    */
   public moveBy(deltaX: number, deltaY: number, useTransition?: boolean): void {
     this.stopAnimation()
@@ -407,7 +575,7 @@ export class ImagePanZoom {
     this.x += deltaX
     this.y += deltaY
 
-    const clamped = this.clampPosition(this.x, this.y)
+    const clamped = this.clampPosition(this.x, this.y, false)
     this.x = clamped.x
     this.y = clamped.y
 
@@ -417,10 +585,6 @@ export class ImagePanZoom {
 
   /**
    * Zoom to specific scale at specified point
-   * @param scale - Target scale
-   * @param pointX - X coordinate for zoom center (optional, defaults to container center)
-   * @param pointY - Y coordinate for zoom center (optional, defaults to container center)
-   * @param useTransition - Whether to use transition animation (default: true if option is enabled)
    */
   public zoomTo(scale: number, pointX?: number, pointY?: number, useTransition?: boolean): void {
     this.stopAnimation()
@@ -448,23 +612,18 @@ export class ImagePanZoom {
     this.x += localX - newLocalX
     this.y += localY - newLocalY
 
+    const clamped = this.clampPosition(this.x, this.y, false)
+    this.x = clamped.x
+    this.y = clamped.y
+
     const shouldUseTransition = useTransition !== undefined ? useTransition : true
     this.applyTransform(shouldUseTransition && this.options.transition)
   }
 
-
-  /**
-   * Animates the kinetic movement of the image based on the current velocity.
-   * This function is called recursively using requestAnimationFrame until the velocity
-   * is too low to continue animating.
-   * The animation is stopped by calling stopAnimation() and applying the
-   * final transform without animation.
-   * @private
-   */
-
-  private animateKinetic(): void {
+  private animateKinetic = (): void => {
     if (Math.abs(this.velocityX) < 0.5 && Math.abs(this.velocityY) < 0.5 && Math.abs(this.velocityScale) < 0.001) {
       this.stopAnimation()
+      this.animateElasticReturn()
       this.applyTransform(false)
       return
     }
@@ -475,6 +634,10 @@ export class ImagePanZoom {
 
     this.scale = this.clampScale(this.scale)
 
+    const clamped = this.clampPosition(this.x, this.y, true)
+    this.x = clamped.x
+    this.y = clamped.y
+
     this.velocityX *= this.options.friction
     this.velocityY *= this.options.friction
     this.velocityScale *= this.options.friction
@@ -482,12 +645,6 @@ export class ImagePanZoom {
     this.applyTransform(false)
     this.animationFrameId = requestAnimationFrame(this.animateKinetic)
   }
-
-
-  /**
-   * Handles wheel event to zoom image.
-   * @param e - Wheel event object.
-   */
 
   private onWheel(e: WheelEvent): void {
     e.preventDefault()
@@ -507,6 +664,7 @@ export class ImagePanZoom {
     if (e.button !== 0) return
 
     this.stopAnimation()
+    this.isAnimatingElastic = false
 
     this.isPanning = true
     this.didMove = false
@@ -528,9 +686,9 @@ export class ImagePanZoom {
 
 
   /**
-   * Handles pointer move event while panning.
-   * Calculates velocity and scales the image accordingly.
-   * @param e - Pointer move event object.
+   * Called when user moves pointer while pressing primary mouse button
+   * It calculates velocity of pan and scale and applies it to the transform
+   * @param {PointerEvent} e - Pointer event
    */
 
   private onPointerMove(e: PointerEvent): void {
@@ -545,8 +703,9 @@ export class ImagePanZoom {
     const nextX = this.startX + dx
     const nextY = this.startY + dy
 
-    this.x = nextX
-    this.y = nextY
+    const clamped = this.clampPosition(nextX, nextY, true)
+    this.x = clamped.x
+    this.y = clamped.y
 
     const now = Date.now()
     const dt = now - this.lastMoveTime
@@ -578,11 +737,21 @@ export class ImagePanZoom {
       this.content.releasePointerCapture(e.pointerId)
     } catch { }
 
-    if (this.didMove && (Math.abs(this.velocityX) > 1 || Math.abs(this.velocityY) > 1 || Math.abs(this.velocityScale) > 0.001)) {
-      this.animationFrameId = requestAnimationFrame(this.animateKinetic)
+    if (this.didMove) {
+      if (Math.abs(this.velocityX) > 1 || Math.abs(this.velocityY) > 1 || Math.abs(this.velocityScale) > 0.001) {
+        this.animationFrameId = requestAnimationFrame(this.animateKinetic)
+      } else {
+        this.animateElasticReturn()
+      }
     }
   }
 
+
+  /**
+   * Called when user double clicks on the image.
+   * Zooms the image in by 50% if the current scale is less than the maximum scale.
+   * @param {MouseEvent} e - The double click event.
+   */
 
   private onDoubleClick(e: MouseEvent): void {
     this.stopAnimation()
@@ -603,6 +772,10 @@ export class ImagePanZoom {
     const newLocalY = localY * scaleRatio
     this.x += localX - newLocalX
     this.y += localY - newLocalY
+
+    const clamped = this.clampPosition(this.x, this.y, false)
+    this.x = clamped.x
+    this.y = clamped.y
 
     this.applyTransform(true)
   }
@@ -668,7 +841,6 @@ export class ImagePanZoom {
       const clampedScale = this.clampScale(newScale)
 
       if (clampedScale !== this.scale) {
-
         const deltaX = currentCenterX - this.lastTouchCenterX
         const deltaY = currentCenterY - this.lastTouchCenterY
 
@@ -693,10 +865,14 @@ export class ImagePanZoom {
 
 
   /**
-   * Handles touch end event.
-   * If the event is triggered because the user has stopped pinching, it calculates the velocity of the pan gesture and starts an animation to smoothly stop the pan gesture.
-   * If the event is triggered because the user has lifted their finger off the screen, it checks if the event is a double tap and handles it accordingly.
-   * @param e - Touch end event object.
+   * Handle touchend event.
+   * If the event is triggered by a single touch point (i.e. the user lifted their finger)
+   * and the last move event happened less than 100ms ago, calculate the velocity of the move.
+   * If the velocity is greater than 1, start the kinetic animation.
+   * If the velocity is less than or equal to 1, start the elastic return animation.
+   * If the event is triggered by no touch points (i.e. the user lifted all their fingers), check if the user was panning.
+   * If the user was panning, simulate a pointerup event to finish the pan.
+   * If the user was not panning, start the double tap check.
    */
 
   private onTouchEnd(e: TouchEvent): void {
@@ -714,7 +890,11 @@ export class ImagePanZoom {
 
         if (Math.abs(this.velocityX) > 1 || Math.abs(this.velocityY) > 1) {
           this.animationFrameId = requestAnimationFrame(this.animateKinetic);
+        } else {
+          this.animateElasticReturn();
         }
+      } else {
+        this.animateElasticReturn();
       }
     }
 
@@ -735,7 +915,6 @@ export class ImagePanZoom {
 
   /**
    * Handle double tap detection for touch devices
-   * @param e - Touch event
    */
   private handleDoubleTapCheck(e: TouchEvent): void {
     const now = Date.now();
@@ -764,8 +943,6 @@ export class ImagePanZoom {
 
   /**
    * Handle double tap zoom (similar to double click)
-   * @param clientX - X coordinate of the tap
-   * @param clientY - Y coordinate of the tap
    */
   private handleDoubleTap(clientX: number, clientY: number): void {
     this.stopAnimation();
@@ -787,6 +964,10 @@ export class ImagePanZoom {
     this.x += localX - newLocalX;
     this.y += localY - newLocalY;
 
+    const clamped = this.clampPosition(this.x, this.y, false);
+    this.x = clamped.x;
+    this.y = clamped.y;
+
     this.applyTransform(true);
   }
 
@@ -802,22 +983,30 @@ export class ImagePanZoom {
     this.velocityX = 0
     this.velocityY = 0
     this.velocityScale = 0
+    this.elasticX = 0
+    this.elasticY = 0
+    this.isAnimatingElastic = false
 
     this.applyTransform(true)
   }
 
   /**
    * Rotate content by specified degrees
-   * @param deg - Degrees to rotate
    */
   public rotate(deg: number): void {
+    this.stopAnimation()
     this.rotation = (this.rotation + deg) % 360
+
+
+    const clamped = this.clampPosition(this.x, this.y, false)
+    this.x = clamped.x
+    this.y = clamped.y
+
     this.applyTransform(true)
   }
 
   /**
    * Get current transform state
-   * @returns Current transform object with scale, x, y, and rotation values
    */
   public getTransform(): Transform {
     return {
@@ -830,9 +1019,10 @@ export class ImagePanZoom {
 
   /**
    * Set transform state
-   * @param transform - Transform object with scale, x, y, and/or rotation values to set
    */
   public setTransform(transform: Partial<Transform>, useTransition?: boolean): void {
+    this.stopAnimation()
+
     if (transform.scale !== undefined) {
       this.scale = this.clampScale(transform.scale)
     }
@@ -846,41 +1036,35 @@ export class ImagePanZoom {
       this.rotation = transform.rotation
     }
 
+
+    const clamped = this.clampPosition(this.x, this.y, false)
+    this.x = clamped.x
+    this.y = clamped.y
+
     const shouldUseTransition = useTransition !== undefined ? useTransition : true
     this.applyTransform(shouldUseTransition && this.options.transition)
   }
 
   /**
    * Get the current viewport bounds in container coordinates
-   * @returns Object with left, top, right, bottom bounds
    */
   public getViewportBounds(): { left: number; top: number; right: number; bottom: number } {
     const rect = this.container.getBoundingClientRect()
     const centerX = rect.width / 2
     const centerY = rect.height / 2
 
-    const rawW = this.content.offsetWidth
-    const rawH = this.content.offsetHeight
-    const rad = this.rotation * Math.PI / 180
-    const cos = Math.cos(rad)
-    const sin = Math.sin(rad)
-
-    const rotatedW = Math.abs(rawW * this.scale * cos) + Math.abs(rawH * this.scale * sin)
-    const rotatedH = Math.abs(rawW * this.scale * sin) + Math.abs(rawH * this.scale * cos)
+    const sizes = this.getSizes()
 
     return {
-      left: centerX + this.x - rotatedW / 2,
-      top: centerY + this.y - rotatedH / 2,
-      right: centerX + this.x + rotatedW / 2,
-      bottom: centerY + this.y + rotatedH / 2
+      left: centerX + this.x - sizes.contentWidth / 2,
+      top: centerY + this.y - sizes.contentHeight / 2,
+      right: centerX + this.x + sizes.contentWidth / 2,
+      bottom: centerY + this.y + sizes.contentHeight / 2
     }
   }
 
   /**
    * Convert container coordinates to image coordinates
-   * @param containerX - X coordinate in container
-   * @param containerY - Y coordinate in container
-   * @returns Object with x, y in image coordinates
    */
   public containerToImage(containerX: number, containerY: number): { x: number; y: number } {
     const rect = this.container.getBoundingClientRect()
@@ -899,9 +1083,6 @@ export class ImagePanZoom {
 
   /**
    * Convert image coordinates to container coordinates
-   * @param imageX - X coordinate in image
-   * @param imageY - Y coordinate in image
-   * @returns Object with x, y in container coordinates
    */
   public imageToContainer(imageX: number, imageY: number): { x: number; y: number } {
     const rect = this.container.getBoundingClientRect()
@@ -920,9 +1101,6 @@ export class ImagePanZoom {
 
   /**
    * Center on specific image coordinates
-   * @param imageX - X coordinate in image
-   * @param imageY - Y coordinate in image
-   * @param useTransition - Whether to use transition animation (default: true if option is enabled)
    */
   public centerOnImagePoint(imageX: number, imageY: number, useTransition?: boolean): void {
     const containerCoords = this.imageToContainer(imageX, imageY)
@@ -955,13 +1133,8 @@ export class ImagePanZoom {
   }
 }
 
-
 /**
  * Factory function to create a new ImagePanZoom instance
- * @param container - Container element to hold the content
- * @param content - Content element to apply pan and zoom to
- * @param options - Options to configure the behavior
- * @returns A new ImagePanZoom instance
  */
 export function createImagePanZoom(
   container: HTMLElement,
