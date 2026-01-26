@@ -14,7 +14,12 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "image-pan-zoom": resolve(__dirname, "dist/image-pan-zoom.mjs"),
+      "image-pan-zoom": resolve(__dirname, "src/index.ts"),
     },
   },
+  server: {
+    watch: {
+      usePolling: true
+    }
+  }
 });
