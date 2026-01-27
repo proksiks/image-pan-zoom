@@ -21,20 +21,24 @@
     "build": "npm run build:lib && npm run build:demo",
     "build:lib": "vite build",
     "build:demo": "vite build --config vite.demo.config.js",
-    "dev": "vite",
-    "dev:demo": "vite --config vite.demo.config.js",
+    "dev:vite": "vite",
+    "dev": "vite --config vite.demo.config.js",
     "preview:demo": "vite preview --config vite.demo.config.js",
     "deploy": "npm run build && npm run deploy:pages",
-    "deploy:pages": "gh-pages -d dist-demo"
+    "deploy:pages": "gh-pages -d dist-demo",
+    "deploy:npm": "npm publish",
+    "update:version:patch": "npm version patch",
+    "update:version:minor": "npm version minor",
+    "update:version:major": "npm version major"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/proksiks/image-pan-zoom.git"
   },
   "devDependencies": {
-    "@types/node": "^25.0.3",
+    "@types/node": "^25.0.10",
     "gh-pages": "^6.3.0",
-    "terser": "^5.44.1",
+    "terser": "^5.46.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.1"
   }
