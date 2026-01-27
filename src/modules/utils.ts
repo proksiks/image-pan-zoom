@@ -8,7 +8,7 @@ interface ImagePanZoomInstance {
   x: number
   y: number
   rotation: number
-  options: Required<{ 
+  options: Required<{
     minScale: number,
     maxScale: number,
     initialScale: number,
@@ -21,7 +21,8 @@ interface ImagePanZoomInstance {
     elastic: boolean,
     elasticResistance: number,
     elasticBounce: number,
-    minElasticDistance: number
+    minElasticDistance: number,
+    enableRotation: boolean
   }>
   elasticX: number
   elasticY: number

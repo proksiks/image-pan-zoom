@@ -54,6 +54,10 @@ export interface ImagePanZoomOptions {
    * Minimum elastic distance (default: 5)
    */
   minElasticDistance?: number
+  /**
+   * Enable rotation gesture with two fingers (default: true)
+   */
+  enableRotation?: boolean
 }
 
 /**

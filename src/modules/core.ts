@@ -13,18 +13,14 @@ export class ImagePanZoom {
   private y: number
   private rotation: number
 
-
   private velocityX: number = 0
   private velocityY: number = 0
   private velocityScale: number = 0
-
-
 
   private transitionDuration: number = 300
   private transitionEasing: string = 'ease-out'
   private isTransitioning: boolean = false
   private transitionTimeout: number | null = null
-
 
   private elasticX: number = 0
   private elasticY: number = 0
@@ -37,7 +33,6 @@ export class ImagePanZoom {
   private boundTouchStart: (e: TouchEvent) => void
   private boundTouchMove: (e: TouchEvent) => void
   private boundTouchEnd: (e: TouchEvent) => void
-
 
   /**
    * Constructor for ImagePanZoom class
@@ -63,6 +58,7 @@ export class ImagePanZoom {
       elasticResistance: options.elasticResistance ?? 0.15,
       elasticBounce: options.elasticBounce ?? 0.3,
       minElasticDistance: options.minElasticDistance ?? 5,
+      enableRotation: options.enableRotation ?? true,
     }
 
     this.scale = this.options.initialScale
@@ -179,8 +175,6 @@ export class ImagePanZoom {
   private onTouchEnd(e: TouchEvent): void {
     handleTouchEnd(this as any, e)
   }
-
-
 
   /**
    * Wrapper methods to allow modules to access private methods

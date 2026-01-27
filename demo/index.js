@@ -46,6 +46,7 @@ function initPanZoom() {
     maxSpeed: 300,
     transition: isTransitionEnabled,
     pinchSpeed: 1,
+    enableRotation: true,
   });
 
   const originalApplyTransform = panzoom.applyTransform;
