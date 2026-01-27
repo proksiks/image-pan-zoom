@@ -1,6 +1,6 @@
 {
   "name": "image-pan-zoom",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A lightweight library for pan and zoom functionality",
   "main": "dist/image-pan-zoom.umd.js",
   "module": "dist/image-pan-zoom.mjs",
